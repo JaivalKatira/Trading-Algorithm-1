@@ -108,7 +108,6 @@ df = df.dropna()
 
 df["SMA50"] = df["Close"].rolling(50).mean()
 
-# RSI
 delta = df["Close"].diff()
 
 gain = delta.clip(lower=0)
@@ -121,15 +120,12 @@ rs = avg_gain / avg_loss
 
 df["RSI"] = 100 - (100/(1+rs))
 
-# Returns + direction
 df["Return"] = df["Close"].pct_change()
 df["Dir"] = np.where(df["Return"]>0,1,-1)
 
-# streak logic
 df["change"] = df["Dir"].ne(df["Dir"].shift()).cumsum()
 df["streak"] = (df.groupby("change").cumcount()+1)*df["Dir"]
 
-# ATR
 tr = np.maximum(
 df["High"]-df["Low"],
 np.maximum(
@@ -141,7 +137,6 @@ abs(df["Low"]-df["Close"].shift())
 df["ATR"] = tr.rolling(14).mean()
 df["ATR_mean"] = df["ATR"].rolling(20).mean()
 
-# momentum
 df["momentum"] = df["Close"]/df["Close"].shift(10)
 
 df = df.dropna()
@@ -188,19 +183,47 @@ streak = latest["streak"]
 
 p_up = prob_map.get(streak,0.5)
 
+# SL & TARGET SETTINGS
+SL_PCT = 0.01
+TP_PCT = 0.015
+
+entry_price = latest["Close"]
+
 st.subheader("📊 Trade Recommendation")
 
 if trend_ok and rsi_ok and momentum_ok and atr_expand and p_up>=0.5:
+
+    stop_loss = entry_price * (1 - SL_PCT)
+    target = entry_price * (1 + TP_PCT)
 
     st.success("✅ LONG TRADE")
 
     st.write("Probability of Up Move:", round(p_up*100,2), "%")
 
+    st.subheader("Trade Plan")
+
+    c1,c2,c3 = st.columns(3)
+
+    c1.metric("Entry", round(entry_price,2))
+    c2.metric("Stop Loss", round(stop_loss,2))
+    c3.metric("Target", round(target,2))
+
 elif not trend_ok and p_up<0.5:
+
+    stop_loss = entry_price * (1 + SL_PCT)
+    target = entry_price * (1 - TP_PCT)
 
     st.error("🔻 SHORT TRADE")
 
     st.write("Probability of Down Move:", round((1-p_up)*100,2), "%")
+
+    st.subheader("Trade Plan")
+
+    c1,c2,c3 = st.columns(3)
+
+    c1.metric("Entry", round(entry_price,2))
+    c2.metric("Stop Loss", round(stop_loss,2))
+    c3.metric("Target", round(target,2))
 
 else:
 
